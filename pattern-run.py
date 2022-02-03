@@ -4,7 +4,7 @@ import snn_delay_utils
 import random
 import argparse
 import singleNeuron
-device = 'cpu'
+device = 'gpu'
 
 print(torch.__version__)
 
@@ -19,8 +19,10 @@ parser.add_argument("-t", "--t", dest="t", default=60000, action='store', help="
 parser.add_argument("-rMin", "--rMin", dest="rMin", default=0, action='store', help="R Min", type=int)
 parser.add_argument("-rMax", "--rMax", dest="rMax", default=90, action='store', help="R Max", type=int)
 parser.add_argument("-fr", "--fr", dest="fr", default=200, action='store', help="frecuencia", type=int)
-parser.add_argument("-th", "--th", dest="th", default=625, action='store', help="threshold", type=int)
+parser.add_argument("-th", "--th", dest="th", default=625, action='store', help="threshold", type=float)
 parser.add_argument("-np", "--np", dest="np", default=1, action='store', help="Cantidad de patrones", type=int)
+parser.add_argument("-ap", "--ap", dest="aPlus", default=.009125, action='store', help="a_plus", type=str)
+parser.add_argument("-am", "--am", dest="aMinus", default=.0125625, action='store', help="a_minus", type=str)
 
 args = parser.parse_args()
 
@@ -36,6 +38,8 @@ r_max = args.rMax  # Frecuencia maxima de spike
 fr = args.fr  # Frecuencia con la que aparece el patron
 th = args.th  # Threshold de la neurona
 num_pattern = args.np  # Cantidad de patrones a insertar
+a_plus = float(args.aPlus)
+a_minus = float(args.aMinus)
 
 # Generamos los spikes
 spike_generator = snn_delay_utils.SpikeTrains(N_in, r_min, r_max, delta_max=Sdt_max)
@@ -73,7 +77,7 @@ pop1 = singleNeuron.STDPLIFDensePopulation(in_channels=N_in, out_channels=N_out,
                                            weight=0.45, alpha=float(np.exp(-1e-3 / 10e-3)),
                                            beta=float(np.exp(-1e-3 / 2e-5)), delay=0,
                                            th=th,
-                                           a_plus=0.05125, a_minus=0.0865625,
+                                           a_plus=a_plus, a_minus=a_minus,
                                            w_max=1.)
 
 # Pre-procesamos PSpikes y NSpikes
@@ -92,7 +96,7 @@ for n in range(T):
     Iprobe[n] = state.I.data.numpy()
     Sprobe[n] = state.S.data.numpy()
     w_end = pop1.fc_layer.weight.data[0].detach().numpy()
-    if n % 1000:
+    if n % 5000 == 0:
         c_l = sum(w_end * (1 - w_end)) / len(w_end)
         print(str(c_l))
 
