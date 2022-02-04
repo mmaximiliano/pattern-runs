@@ -48,8 +48,6 @@ pat_times = torch.zeros(T)
 
 # Generamos los spikes para testing
 Sin_test = Sin.clone().detach()
-s_test = s.clone().detach()
-t_test = t.clone().detach()
 pat_times_test = torch.zeros(T)
 
 # Evaluate the mean firing rate
