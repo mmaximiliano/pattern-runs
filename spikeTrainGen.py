@@ -40,10 +40,17 @@ r_max = args.rMax  # Frecuencia maxima de spike
 fr = args.fr  # Frecuencia con la que aparece el patron
 num_pattern = args.np  # Cantidad de patrones a insertar
 
-# Generamos los spikes
+# Generamos los spikes para training
 spike_generator = snn_delay_utils.SpikeTrains(N_in, r_min, r_max, delta_max=Sdt_max)
 spike_generator.add_spikes(T)
 Sin, s, t = spike_generator.get_spikes(torch.zeros(T, N_in))
+pat_times = torch.zeros(T)
+
+# Generamos los spikes para testing
+Sin_test = Sin.clone().detach()
+s_test = s.clone().detach()
+t_test = t.clone().detach()
+pat_times_test = torch.zeros(T)
 
 # Evaluate the mean firing rate
 rate = np.count_nonzero(spike_generator.spikes) * 1000.0 / T / N_in
@@ -70,6 +77,23 @@ for i in range(num_pattern):
             Pattern.index_add_(0, c_index, tmp)  # Copiamos las neuronas
             c_index = torch.tensor(range(0 + j, pat_len + j, 1))  # Generamos el indice dinamico
             Sin.index_copy_(0, c_index, Pattern)  # Pegamos el patron
+            pat_times[j: j + pat_len] = 1
+
+    # Ponemos el patron en posiciones random
+    noisySpikes = random.choice(range(1, 15))
+    for j in range(i, T, pat_len):
+        if noisySpikes == 0:
+            c_index = torch.tensor(range(pat_len))                  # Generamos el indice (0, p_len)
+            tmp = Sin_test[j:pat_len + j].clone().detach()          # Copiamos la porcion del tren de spike
+            tmp[:, index_inv] = 0                                   # Anulamos las neuronas segun index_A_inv
+            Pattern[:, index] = 0                                   # Anulamos las neuronas segun index_A
+            Pattern.index_add_(0, c_index, tmp)                     # Copiamos las neuronas
+            c_index = torch.tensor(range(0 + j, pat_len + j, 1))    # Generamos el indice dinamico
+            Sin_test.index_copy_(0, c_index, Pattern)               # Pegamos el patron
+            pat_times_test[j: j + pat_len] = 1
+            noisySpikes = random.choice(range(1, 20))               # Elegimos la proxima cantidad a esperar
+        else:
+            noisySpikes -= 1
 
 # Pre-procesamos PSpikes y NSpikes
 dt_ltp = pat_len / 2  # Cantidad de timesteps que miro hacia atras
@@ -77,10 +101,20 @@ dt_ltd = pat_len * 3  # Cantidad de timesteps que miro hacia delante
 PSpikes = singleNeuron.preSpikes(T, dt_ltp, torch.zeros(T, N_in), Sin)
 NSpikes = singleNeuron.nextSpikes(T, dt_ltd, torch.zeros(T, N_in), Sin)
 
+PSpikes_test = singleNeuron.preSpikes(T, dt_ltp, torch.zeros(T, N_in), Sin_test)
+NSpikes_test = singleNeuron.nextSpikes(T, dt_ltd, torch.zeros(T, N_in), Sin_test)
 
+pathlib.Path("./spike_trains/" + str(seed)).mkdir(parents=True, exist_ok=True)
 # Save Training sequence
 print("Save train sequence")
-pathlib.Path("./spike_trains/" + seed).mkdir(parents=True, exist_ok=True)
-torch.save(Sin, "./spike_trains/" + seed + 'sin.pt')
-torch.save(PSpikes, "./spike_trains/" + seed + 'pSpikes.pt')
-torch.save(NSpikes, "./spike_trains/" + seed + 'nSpikes.pt')
+torch.save(Sin, "./spike_trains/" + str(seed) + 'sin.pt')
+torch.save(PSpikes, "./spike_trains/" + str(seed) + 'pSpikes.pt')
+torch.save(NSpikes, "./spike_trains/" + str(seed) + 'nSpikes.pt')
+torch.save(pat_times, "./spike_trains/" + str(seed) + 'pat_times.pt')
+
+# Save Training sequence
+print("Save testing sequence")
+torch.save(Sin_test, "./spike_trains/" + str(seed) + 'sin_test.pt')
+torch.save(PSpikes_test, "./spike_trains/" + str(seed) + 'pSpikes_test.pt')
+torch.save(NSpikes_test, "./spike_trains/" + str(seed) + 'nSpikes_test.pt')
+torch.save(pat_times_test, "./spike_trains/" + str(seed) + 'pat_times_test.pt')
