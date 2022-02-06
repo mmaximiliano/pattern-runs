@@ -4,19 +4,16 @@ echo "----- Running massive pattern creator -----"
 
 c=8
 
-for th in 500 550 600 650 700 750 800 850
+for th in 450 470 490 500 520 540
 do
-  for ap in "0.009125" "550" "600" "650"
+  for seed in 1 2 3 4 5 6 7 8
   do
-    for am in "0.009125" "550" "600" "650"
-      do
-        echo "Loop: $c/1"
-        echo "Running th= $th a_minus= $am a_plus= $ap"
-        python3 pattern-run.py -th $th -am $am -ap $ap
-        echo
-        c=$((c+1))
-      done
-    done
+    echo "Loop: $c/1"
+    echo "Running th= $th seed= $seed"
+    python3 pattern-run.py -th $th -seed $seed
+    echo
+    c=$((c+1))
+  done
 done
 
 echo "Done."
