@@ -105,14 +105,14 @@ NSpikes_test = singleNeuron.nextSpikes(T, dt_ltd, torch.zeros(T, N_in), Sin_test
 pathlib.Path("./spike_trains/" + str(seed)).mkdir(parents=True, exist_ok=True)
 # Save Training sequence
 print("Save train sequence")
-torch.save(Sin, "./spike_trains/" + str(seed) + 'sin.pt')
-torch.save(PSpikes, "./spike_trains/" + str(seed) + 'pSpikes.pt')
-torch.save(NSpikes, "./spike_trains/" + str(seed) + 'nSpikes.pt')
-torch.save(pat_times, "./spike_trains/" + str(seed) + 'pat_times.pt')
+torch.save(Sin, "./spike_trains/" + str(seed) + '/sin.pt')
+torch.save(PSpikes, "./spike_trains/" + str(seed) + '/pSpikes.pt')
+torch.save(NSpikes, "./spike_trains/" + str(seed) + '/nSpikes.pt')
+torch.save(pat_times, "./spike_trains/" + str(seed) + '/pat_times.pt')
 
 # Save Training sequence
 print("Save testing sequence")
-torch.save(Sin_test, "./spike_trains/" + str(seed) + 'sin_test.pt')
-torch.save(PSpikes_test, "./spike_trains/" + str(seed) + 'pSpikes_test.pt')
-torch.save(NSpikes_test, "./spike_trains/" + str(seed) + 'nSpikes_test.pt')
-torch.save(pat_times_test, "./spike_trains/" + str(seed) + 'pat_times_test.pt')
+torch.save(Sin_test, "./spike_trains/" + str(seed) + '/sin_test.pt')
+torch.save(PSpikes_test, "./spike_trains/" + str(seed) + '/pSpikes_test.pt')
+torch.save(NSpikes_test, "./spike_trains/" + str(seed) + '/nSpikes_test.pt')
+torch.save(pat_times_test, "./spike_trains/" + str(seed) + '/pat_times_test.pt')
