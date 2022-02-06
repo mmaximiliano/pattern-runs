@@ -1,7 +1,7 @@
 # Personal ignores
 **/.DS_Store
 **/.idea
-./spike_trains/*
+./spike_trains/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
