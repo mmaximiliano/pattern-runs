@@ -46,10 +46,10 @@ pop1 = singleNeuron.STDPLIFDensePopulation(in_channels=N_in, out_channels=N_out,
 # Pre-procesamos PSpikes y NSpikes
 dt_ltp = pat_len / 2  # Cantidad de timesteps que miro hacia atras
 dt_ltd = pat_len * 3  # Cantidad de timesteps que miro hacia delante
-PSpikes = torch.load('./spike_trains/' + str(seed) + 'pSpikes.pt')
-NSpikes = torch.load('./spike_trains/' + str(seed) + 'nSpikes.pt')
+PSpikes = torch.load('./spike_trains/' + str(seed) + '/pSpikes.pt')
+NSpikes = torch.load('./spike_trains/' + str(seed) + '/nSpikes.pt')
 
-Sin = torch.load('./spike_trains/' + str(seed) + 'sin.pt')
+Sin = torch.load('./spike_trains/' + str(seed) + '/sin.pt')
 
 # Realizamos el entrenamiento STDP
 Uprobe = np.empty([T, N_out])
@@ -66,11 +66,11 @@ for n in range(T):
 # Pre-procesamos PSpikes y NSpikes
 dt_ltp = pat_len / 2  # Cantidad de timesteps que miro hacia atras
 dt_ltd = pat_len * 3  # Cantidad de timesteps que miro hacia delante
-PSpikes_test = torch.load("./spike_trains/" + str(seed) + 'pSpikes_test.pt')
-NSpikes_test = torch.load("./spike_trains/" + str(seed) + 'nSpikes_test.pt')
+PSpikes_test = torch.load("./spike_trains/" + str(seed) + '/pSpikes_test.pt')
+NSpikes_test = torch.load("./spike_trains/" + str(seed) + '/nSpikes_test.pt')
 
-Sin_test = torch.load("./spike_trains/" + str(seed) + 'sin_test.pt')
-pat_times_test = torch.load("./spike_trains/" + str(seed) + 'pat_times_test.pt')
+Sin_test = torch.load("./spike_trains/" + str(seed) + '/sin_test.pt')
+pat_times_test = torch.load("./spike_trains/" + str(seed) + '/pat_times_test.pt')
 
 # Realizamos el entrenamiento STDP
 Uprobe_t = np.empty([T, N_out])
@@ -87,4 +87,4 @@ accuracy, precision, recall, f1, fake_alarms, missed_alarms = singleNeuron.get_m
                                                                                                 Sprobe_t, pat_len)
 metrics = np.array([accuracy, precision, recall, f1, fake_alarms, missed_alarms], dtype=float)
 pathlib.Path("./spike_trains/" + str(seed)).mkdir(parents=True, exist_ok=True)
-np.save("./spike_trains/" + str(seed) + '/' + 'metrics_test.npy', metrics)
+np.save("./spike_trains/" + str(seed) + '/' + 'metrics_test_' + str(th) + '.npy', metrics)
