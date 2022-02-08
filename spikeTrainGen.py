@@ -54,16 +54,18 @@ pat_times_test = torch.zeros(T)
 rate = np.count_nonzero(spike_generator.spikes) * 1000.0 / T / N_in
 print("Spike train rate: " + str(rate))
 
+patterns = []
 # Pegamos el patron a lo largo del tren de spikes
 for i in range(num_pattern):
     # Generamos un patron con el mismo rate
     index = random.sample(range(N_in), N_pattern)
     index_inv = singleNeuron.find_missing(index, N_in)  # Neuronas involucradas en el Patron
 
-    Pattern_base = Sin[150 + (i * 1000):200 + (i * 1000), :].clone().detach()
+    Pattern_base = Sin[500 + (i * 1000):550 + (i * 1000), :].clone().detach()
     Pattern_base[:, index] = 0
     Pattern = Pattern_base.clone().detach()
     rate = np.count_nonzero(Pattern[:, index_inv]) * 1000.0 / pat_len / N_pattern
+    patterns.append({'index_inv': index_inv, 'index': index, 'pattern': Pattern})
     print('Pattern ' + str(i) + ': Resulting mean rate: %d Hz' % rate)
 
     for j in range(fr * i, T, fr * num_pattern):
@@ -77,21 +79,25 @@ for i in range(num_pattern):
             Sin.index_copy_(0, c_index, Pattern)  # Pegamos el patron
             pat_times[j: j + pat_len] = 1
 
-    # Ponemos el patron en posiciones random
-    noisySpikes = random.choice(range(1, 15))
-    for j in range(i, T, pat_len):
-        if noisySpikes == 0:
-            c_index = torch.tensor(range(pat_len))                  # Generamos el indice (0, p_len)
-            tmp = Sin_test[j:pat_len + j].clone().detach()          # Copiamos la porcion del tren de spike
-            tmp[:, index_inv] = 0                                   # Anulamos las neuronas segun index_A_inv
-            Pattern[:, index] = 0                                   # Anulamos las neuronas segun index_A
-            Pattern.index_add_(0, c_index, tmp)                     # Copiamos las neuronas
-            c_index = torch.tensor(range(0 + j, pat_len + j, 1))    # Generamos el indice dinamico
-            Sin_test.index_copy_(0, c_index, Pattern)               # Pegamos el patron
-            pat_times_test[j: j + pat_len] = 1
-            noisySpikes = random.choice(range(1, 20))               # Elegimos la proxima cantidad a esperar
-        else:
-            noisySpikes -= 1
+# Ponemos el patron en posiciones random
+noisySpikes = random.choice(range(1, 15))
+for j in range(0, T, pat_len):
+    if noisySpikes == 0:
+        pattern_index = random.choice(range(0, num_pattern))
+        index_inv = patterns[pattern_index].get("index_inv")
+        Pattern = patterns[pattern_index].get("pattern")
+        index = patterns[pattern_index].get("index")
+        c_index = torch.tensor(range(pat_len))                  # Generamos el indice (0, p_len)
+        tmp = Sin_test[j:pat_len + j].clone().detach()          # Copiamos la porcion del tren de spike
+        tmp[:, index_inv] = 0                                   # Anulamos las neuronas segun index_A_inv
+        Pattern[:, index] = 0                                   # Anulamos las neuronas segun index_A
+        Pattern.index_add_(0, c_index, tmp)                     # Copiamos las neuronas
+        c_index = torch.tensor(range(0 + j, pat_len + j, 1))    # Generamos el indice dinamico
+        Sin_test.index_copy_(0, c_index, Pattern)               # Pegamos el patron
+        pat_times_test[j: j + pat_len] = pattern_index + 1      # Ponemos el numero del patron que aparece
+        noisySpikes = random.choice(range(1, 20))               # Elegimos la proxima cantidad a esperar
+    else:
+        noisySpikes -= 1
 
 # Pre-procesamos PSpikes y NSpikes
 dt_ltp = pat_len / 2  # Cantidad de timesteps que miro hacia atras
