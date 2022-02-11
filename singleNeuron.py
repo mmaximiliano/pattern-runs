@@ -51,7 +51,7 @@ class LIFDensePopulation(nn.Module):
 
     NeuronState = namedtuple('NeuronState', ['U', 'I', 'S', 'D', 'C'])
 
-    def __init__(self, in_channels, out_channels, weight=.13, bias=False, alpha=.9, beta=.85, delay=0, th=1.):
+    def __init__(self, in_channels, out_channels, weight=.5, bias=False, alpha=.9, beta=.85, delay=0, th=1., omega=.25):
         super(LIFDensePopulation, self).__init__()
         self.fc_layer = nn.Linear(in_channels, out_channels)
         self.in_channels = in_channels
@@ -60,17 +60,18 @@ class LIFDensePopulation(nn.Module):
         self.beta = beta
         self.delay = delay
         self.th = th
+        self.omega = omega
         self.state = state = self.NeuronState(U=torch.zeros(1, out_channels),
                                               I=torch.zeros(1, out_channels),
                                               S=torch.zeros(1, out_channels),
                                               D=delay,
                                               C=torch.zeros(1, out_channels))
-        self.fc_layer.weight.data.uniform_(weight, weight)
+        self.fc_layer.weight.data.uniform_(weight, 1.)  # Random init of weights
         self.fc_layer.bias.data.uniform_(0., 0.)
 
     def forward(self, Sin_t):
         state = self.state
-        U = self.alpha * state.U + state.I - (state.S * state.U)
+        U = self.alpha * state.U + state.I - (state.S * state.U) - (self.omega*self.th * (torch.sum(state.S))) + (self.omega*self.th*state.S)
         I = self.beta * state.I + self.fc_layer(Sin_t)
         # update the neuronal state
         S = (U > self.th).float()
@@ -106,7 +107,7 @@ class LIFDensePopulation(nn.Module):
 # A STDP LIF neuron model derived from the LIF Neuron
 # It overrides the synaptic weights update operations (previously empty) to perform LTP or LTD
 class STDPLIFDensePopulation(LIFDensePopulation):
-    def __init__(self, in_channels, out_channels, weight=.13, bias=False, alpha=.9, beta=.85, delay=0, th=1.,
+    def __init__(self, in_channels, out_channels, weight=.13, bias=False, alpha=.9, beta=.85, delay=0, th=1., omega=.2,
                  a_plus=0.03125, a_minus=0.0265625, tau_plus=16.8, tau_minus=33.7, w_max=1., norm=False):
         # STDP parameters
         self.a_plus = a_plus
@@ -115,47 +116,51 @@ class STDPLIFDensePopulation(LIFDensePopulation):
         self.tau_minus = tau_minus
         self.w_max = w_max
         self.norm = norm
+        self.omega = omega
 
         # Call the parent contructor
         super(STDPLIFDensePopulation, self).__init__(in_channels, out_channels, weight, bias=False,
-                                                     alpha=alpha, beta=beta, delay=delay, th=th)
+                                                     alpha=alpha, beta=beta, delay=delay, th=th, omega=omega)
 
     # Long Term synaptic Potentiation
     def LTP_op(self, nState, PSpikes):
+        # Vemos donde tenemos que aplicar STDP (si nuestra neurona hizo spike y las anteriores tambien)
+        stdp = torch.matmul(torch.transpose(nState.S, 0, 1), PSpikes)
         # Solo consideramos los ultimos dt spikes provenientes de cada synapse en la memoria
-        # Como caso de prueba supongamos que solo miramos 1 t hacia atras
-        last_spikes_op = PSpikes  # Distancia en tiempo al ultimo spike
+        last_spikes_op = stdp  # Distancia en tiempo al ultimo spike
         # Reward all last synapse spikes that happened after the previous neutron spike
-        rewards_op = torch.where(torch.logical_and(last_spikes_op, nState.S),
+        rewards_op = torch.where(torch.gt(stdp, 0),
                                  self.a_plus * torch.exp(torch.negative(last_spikes_op) / self.tau_plus).double(),
                                  0.)
 
         # Obtenemos los nuevos pesos
-        new_w_op = torch.add(self.fc_layer.weight[0], rewards_op)
+        new_w_op = torch.add(self.fc_layer.weight, rewards_op)
 
         # Actualizamos el valor de los nuevos pesos
         # Nos aseguramos que esten en el rango [0,1]
         with torch.no_grad():
-            self.fc_layer.weight[0] = torch.clip(new_w_op, 0.0, self.w_max)
+            self.fc_layer.weight = torch.nn.Parameter(torch.clip(new_w_op, 0.0, self.w_max).float())
 
     # Long Term synaptic Depression
     def LTD_op(self, nState, NSpikes, PSpikes):
-        next_spikes_op = NSpikes  # Distancia en tiempo al ultimo spike
+        # Vemos donde tenemos que aplicar STDP (neurona hizo spike y las anteriores tambien, pero no se hizo ltp)
+        stdp = torch.matmul(torch.transpose(nState.S, 0, 1), NSpikes)
+        apply_stdp = torch.matmul(torch.transpose(nState.S, 0, 1),
+                                  torch.logical_and(NSpikes, torch.logical_not(PSpikes)).float())
+        next_spikes_op = stdp  # Distancia en tiempo al ultimo spike
         # Infligimos penalties en los nuevos spikes de sinapsis que no hicieron spike
         # La penalidad es la misma para todos los nuevos spikes, e inversamentente exponencial
         # al tiempo desde el ultimo spike
         # de momento asumimos que le pifiamos por dt
-        penalties_op = torch.where(torch.logical_and(nState.S,
-                                                     torch.logical_and(next_spikes_op,
-                                                                       torch.logical_not(PSpikes))),
-                                   self.a_minus * torch.exp(torch.negative(NSpikes / self.tau_minus)).double(),
+        penalties_op = torch.where(torch.gt(apply_stdp, 0),
+                                   self.a_minus * torch.exp(torch.negative(stdp / self.tau_minus)).double(),
                                    0.)
 
         # Evaluate new weights
-        new_w_op = torch.subtract(self.fc_layer.weight[0], penalties_op)
+        new_w_op = torch.subtract(self.fc_layer.weight, penalties_op)
         # Update with new weights clamped to [0,1]
         with torch.no_grad():
-            self.fc_layer.weight[0] = torch.clip(new_w_op, 0.0, self.w_max)
+            self.fc_layer.weight = torch.nn.Parameter(torch.clip(new_w_op, 0.0, self.w_max).float())
 
     def normalize(self, norm):
         if norm:
@@ -165,8 +170,8 @@ class STDPLIFDensePopulation(LIFDensePopulation):
     # Redefinimos forward, donde PSpikes son los dt spikes previos
     def forward(self, Sin_t, PSpikes, NSpikes):
         nState = super(STDPLIFDensePopulation, self).forward(Sin_t)  # Calculo el estado actual
-        self.LTP_op(nState, PSpikes)
-        self.LTD_op(nState, NSpikes, PSpikes)
+        self.LTP_op(nState, torch.unsqueeze(PSpikes,0))
+        self.LTD_op(nState, torch.unsqueeze(NSpikes,0), torch.unsqueeze(PSpikes,0))
         self.normalize(self.norm)
         return self.state
 
